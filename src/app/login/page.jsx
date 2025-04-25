@@ -37,6 +37,8 @@ export default function LoginPage() {
         <TextInput
           id="email"
           type="email"
+          placeholder='Email'
+          color='white'
           value={email}
           onChange={e => setEmail(e.target.value)}
           className="mb-4"
@@ -45,9 +47,12 @@ export default function LoginPage() {
         <TextInput
           id="password"
           type="password"
+          placeholder='Mode de passe'
+          color='white'
           value={password}
           onChange={e => setPassword(e.target.value)}
-          className="mb-6"
+          className="mb-6 bg-white"
+          
         />
         <Button onClick={handleLogin} className="w-full">
           Se connecter
