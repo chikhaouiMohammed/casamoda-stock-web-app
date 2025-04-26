@@ -62,12 +62,7 @@ export default function AppNavbar() {
               amiechermitti@hotmail.com
             </span>
           </DropdownHeader>
-          <DropdownItem href='https://console.firebase.google.com/project/akcher-stock-app/authentication/users' onClick={() => {/* change password */}}>
-            Modifier Mot de Passe
-          </DropdownItem>
-          <DropdownItem onClick={() => router.push('/settings')}>
-            Paramètres
-          </DropdownItem>
+          
           <DropdownItem onClick={handleLogout}>
             Déconnexion
           </DropdownItem>
@@ -91,3 +86,11 @@ export default function AppNavbar() {
     </Navbar>
   );
 }
+
+
+// {/* <DropdownItem href='https://console.firebase.google.com/project/akcher-stock-app/authentication/users' onClick={() => {/* change password */}}>
+//             Modifier Mot de Passe
+//           </DropdownItem>
+//           <DropdownItem onClick={() => router.push('/settings')}>
+//             Paramètres
+//           </DropdownItem> */}

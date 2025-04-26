@@ -88,16 +88,15 @@ export default function DashboardPage() {
     })();
   }, [checkingAuth]);
 
-  // 3️⃣ Recompute stats & daily table (now including returns as negative lines)
+  // 3️⃣ Recompute stats & daily table, including returns as negative, sorted oldest→newest
   useEffect(() => {
     if (!sales.length || !products.length) return;
 
-    // build start/end bounds
-    const [yD,mD,dD] = day.split('-').map(Number);
+    const [yD, mD, dD] = day.split('-').map(Number);
     const dayStart   = new Date(yD, mD-1, dD, 0,0,0);
     const dayEnd     = new Date(yD, mD-1, dD+1, 0,0,0);
 
-    const [yM,mM]    = month.split('-').map(Number);
+    const [yM, mM]    = month.split('-').map(Number);
     const monthStart = new Date(yM, mM-1, 1, 0,0,0);
     const monthEnd   = new Date(yM, mM,   1, 0,0,0);
 
@@ -105,14 +104,11 @@ export default function DashboardPage() {
     const filterBy = (arr, start, end) =>
       arr.filter(x => { const t = x.date.toDate(); return t>=start && t<end; });
 
-    // today's sales & returns
     const sd = filterBy(sales, dayStart, dayEnd);
     const rd = filterBy(returns_, dayStart, dayEnd);
-    // this month's sales & returns
     const sm = filterBy(sales, monthStart, monthEnd);
     const rm = filterBy(returns_, monthStart, monthEnd);
 
-    // metrics
     const revDay   = sum(sd) - sum(rd);
     const revMonth = sum(sm) - sum(rm);
     const qtyDay   = sd.reduce((a,{quantity})=>a+quantity,0)
@@ -124,7 +120,6 @@ export default function DashboardPage() {
     setProductsSoldDay(qtyDay);
     setAvgBasketDay(avgDay);
 
-    // now build dailyRecords *including* returns entries as negatives
     const saleRecords = sd.map(sale => {
       const name = sale.productName
         ?? products.find(p=>p.id===sale.productId)?.name
@@ -150,7 +145,12 @@ export default function DashboardPage() {
       };
     });
 
-    setDailyRecords([...saleRecords, ...returnRecords]);
+    // Sort oldest first
+    const combined = [...saleRecords, ...returnRecords].sort((a,b) =>
+      a.date.toDate() - b.date.toDate()
+    );
+
+    setDailyRecords(combined);
   }, [sales, returns_, products, day, month]);
 
   // 4️⃣ Annual chart
@@ -245,9 +245,7 @@ export default function DashboardPage() {
                 <FlowTableBody className="divide-y">
                   {dailyRecords.map(r => (
                     <TableRow key={r.id} className="hover:bg-gray-50">
-                      <TableCell>
-                        {formatFirebaseDate(r.date)}
-                      </TableCell>
+                      <TableCell>{formatFirebaseDate(r.date)}</TableCell>
                       <TableCell>{r.name}</TableCell>
                       <TableCell>{r.quantity}</TableCell>
                       <TableCell>{r.unitPrice.toFixed(2)}</TableCell>
@@ -276,12 +274,15 @@ export default function DashboardPage() {
             />
           </div>
           <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={chartData} margin={{ top:10, right:30, left:0, bottom:0 }}>
+            <LineChart
+              data={chartData}
+              margin={{ top:10, right:30, left:0, bottom:0 }}
+            >
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="mois" tickLine={false} />
               <YAxis tickLine={false} tick={{ fontSize:12 }} tickFormatter={v=>`${v}DA`} />
               <ReTooltip formatter={v=>`${v.toFixed(2)} DA`} />
-              <Line type="monotone" dataKey="revenu" stroke="#005D2F" strokeWidth={2} dot={{r:4}}/>
+              <Line type="monotone" dataKey="revenu" stroke="#005D2F" strokeWidth={2} dot={{r:4}} />
             </LineChart>
           </ResponsiveContainer>
         </div>
