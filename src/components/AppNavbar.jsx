@@ -34,7 +34,7 @@ export default function AppNavbar() {
   };
 
   return (
-    <Navbar className="bg-[#005D2F]" fluid rounded>
+    <Navbar className="bg-[#005D2F] text-white" fluid rounded>
       <NavbarBrand
         className="cursor-pointer"
         onClick={() => router.push('/dashboard')}

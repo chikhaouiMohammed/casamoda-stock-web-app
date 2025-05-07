@@ -254,8 +254,8 @@ export default function StatistiquesPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {cards.map((c,i) => (
             <Card key={i} className="bg-white">
-              <h5 className="text-lg text-gray-400">{c.label}</h5>
-              <p className="mt-1 text-2xl font-bold text-white">{c.value}</p>
+              <h5 className="text-lg text-black">{c.label}</h5>
+              <p className="mt-1 text-2xl font-bold text-black">{c.value}</p>
             </Card>
           ))}
         </div>
