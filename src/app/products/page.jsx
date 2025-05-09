@@ -62,6 +62,7 @@ export default function ProductsPage() {
   // —— Original state & logic ——
   const storeId = 'akcher';
   const [products, setProducts] = useState([]);
+  // Categories now contain .color and .colorName
   const [categories, setCategories] = useState([]);
   const [filter, setFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -77,7 +78,7 @@ export default function ProductsPage() {
   const [input, setInput] = useState({ name: '', categoryId: '', price: '', quantity: '' });
   const [delId, setDelId] = useState('');
 
-  // Fetch data
+  // Fetch categories & products
   useEffect(() => {
     fetchCategories();
     fetchProducts();
@@ -87,7 +88,10 @@ export default function ProductsPage() {
     const snap = await getDocs(
       query(collection(db, 'categories'), where('storeId', '==', storeId))
     );
-    setCategories(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    setCategories(snap.docs.map(d => ({
+      id: d.id,
+      ...d.data()
+    })));
   };
 
   const fetchProducts = async () => {
@@ -95,7 +99,7 @@ export default function ProductsPage() {
     const snap = await getDocs(
       query(collection(db, 'products'), where('storeId', '==', storeId))
     );
-    setProducts(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     setLoading(false);
   };
 
@@ -119,8 +123,7 @@ export default function ProductsPage() {
     setShowReturn(false);
     setTransactionData({ quantity: '', price: '' });
     await fetchProducts();
-    // feedback to user
-    window.alert(isReturn ? 'Retour enregistré avec succès !' : 'Vente enregistrée avec succès !');
+    window.alert(isReturn ? 'Retour enregistré !' : 'Vente enregistrée !');
   };
 
   // Add/edit product
@@ -135,10 +138,10 @@ export default function ProductsPage() {
     };
     if (currentProduct) {
       await updateDoc(doc(db, 'products', currentProduct.id), data);
-      window.alert('Produit mis à jour avec succès !');
+      window.alert('Produit mis à jour !');
     } else {
       await addDoc(collection(db, 'products'), { ...data, createdAt: serverTimestamp() });
-      window.alert('Nouveau produit créé avec succès !');
+      window.alert('Nouveau produit créé !');
     }
     setShowAdd(false);
     setInput({ name: '', categoryId: '', price: '', quantity: '' });
@@ -161,10 +164,9 @@ export default function ProductsPage() {
     await deleteDoc(doc(db, 'products', delId));
     setShowDelete(false);
     await fetchProducts();
-    window.alert('Produit supprimé définitivement !');
+    window.alert('Produit supprimé !');
   };
 
-  // —— Render only after auth check passes ——
   if (checkingAuth) return null;
 
   return (
@@ -176,18 +178,18 @@ export default function ProductsPage() {
         <div className="flex flex-col sm:flex-row justify-between gap-4 mb-6">
           <div className="flex flex-col sm:flex-row gap-2 flex-1">
             <TextInput
-              placeholder="Rechercher produits..."
+              placeholder="Rechercher produits…"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={e => setSearchQuery(e.target.value)}
               className="flex-1 bg-white"
             />
             <Select
               value={filter}
-              onChange={(e) => setFilter(e.target.value)}
+              onChange={e => setFilter(e.target.value)}
               className="min-w-[200px] bg-white"
             >
               <option value="">Toutes catégories</option>
-              {categories.map((c) => (
+              {categories.map(c => (
                 <option key={c.id} value={c.id}>
                   {c.name}
                 </option>
@@ -195,14 +197,12 @@ export default function ProductsPage() {
             </Select>
           </div>
           <Button
-            onClick={() => {
-              setCurrentProduct(null);
-              setShowAdd(true);
-            }}
+            onClick={() => { setCurrentProduct(null); setShowAdd(true); }}
             color="green"
             className="bg-white text-gray-900 hover:bg-gray-50 border border-gray-200 shadow-sm"
           >
-            + Nouveau produit
+            <PlusIcon className="h-5 w-5 mr-2 text-white" />
+            Nouveau produit
           </Button>
         </div>
 
@@ -220,94 +220,89 @@ export default function ProductsPage() {
             </TableHead>
             <FlowTableBody>
               {products
-                .filter((p) =>
-                  p.name.toLowerCase().includes(searchQuery.toLowerCase())
-                )
-                .filter((p) => !filter || p.categoryId === filter)
-                .map((p) => (
-                  <TableRow
-                    key={p.id}
-                    className="hover:bg-gray-50 border-b-[1px]"
-                  >
-                    <TableCell className="font-medium">{p.name}</TableCell>
-                    <TableCell>
-                      <span className="px-2 py-1 bg-gray-100 rounded text-sm">
-                        {categories.find((c) => c.id === p.categoryId)?.name ||
-                          'N/A'}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-blue-600">
-                      {(p.price || 0).toFixed(2)} DA
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        color={p.quantity > 0 ? 'green' : 'red'}
-                        className="w-fit"
-                      >
-                        {p.quantity} en stock
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Tooltip content="Vente">
-                          <Button
-                            color="none"
-                            size="xs"
-                            className="text-green-600 bg-transparent hover:bg-blue-900"
-                            onClick={() => {
-                              setCurrentProduct(p);
-                              setShowSale(true);
-                            }}
-                          >
-                            <CurrencyDollarIcon className="h-4 w-4" />
-                          </Button>
-                        </Tooltip>
-                        <Tooltip content="Récupérer">
-                          <Button
-                            color="none"
-                            size="xs"
-                            className="text-purple-500 bg-transparent hover:bg-blue-900"
-                            onClick={() => {
-                              setCurrentProduct(p);
-                              setShowReturn(true);
-                            }}
-                          >
-                            <ArrowPathIcon className="h-4 w-4" />
-                          </Button>
-                        </Tooltip>
-                        <Tooltip content="Modifier">
-                          <Button
-                            color="none"
-                            size="xs"
-                            className="text-blue-600 bg-transparent hover:bg-blue-900"
-                            onClick={() => openEdit(p)}
-                          >
-                            <PencilIcon className="h-4 w-4" />
-                          </Button>
-                        </Tooltip>
-                        <Tooltip content="Supprimer">
-                          <Button
-                            color="none"
-                            size="xs"
-                            className="text-red-600 bg-transparent hover:bg-blue-900"
-                            onClick={() => {
-                              setDelId(p.id);
-                              setShowDelete(true);
-                            }}
-                          >
-                            <TrashIcon className="h-4 w-4" />
-                          </Button>
-                        </Tooltip>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                .filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                .filter(p => !filter || p.categoryId === filter)
+                .map(p => {
+                  const cat = categories.find(c => c.id === p.categoryId) || {};
+                  return (
+                    <TableRow key={p.id} className="hover:bg-gray-50 border-b-[1px]">
+                      <TableCell className="font-medium">{p.name}</TableCell>
+
+                      {/* Category with color swatch */}
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          <span
+                            className="w-4 h-4 rounded-full border"
+                            style={{ backgroundColor: cat.color || '#ccc' }}
+                            title={cat.colorName || cat.color}
+                          />
+                          <span className="text-gray-800 text-sm">
+                            {cat.name || '—'}
+                          </span>
+                        </div>
+                      </TableCell>
+
+                      <TableCell className="text-blue-600">
+                        {(p.price || 0).toFixed(2)} DA
+                      </TableCell>
+                      <TableCell>
+                        <Badge color={p.quantity > 0 ? 'green' : 'red'} className="w-fit">
+                          {p.quantity} en stock
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Tooltip content="Vente">
+                            <Button
+                              color="none"
+                              size="xs"
+                              className="text-green-600 bg-transparent hover:bg-blue-900"
+                              onClick={() => { setCurrentProduct(p); setShowSale(true); }}
+                            >
+                              <CurrencyDollarIcon className="h-4 w-4" />
+                            </Button>
+                          </Tooltip>
+                          <Tooltip content="Récupérer">
+                            <Button
+                              color="none"
+                              size="xs"
+                              className="text-purple-500 bg-transparent hover:bg-blue-900"
+                              onClick={() => { setCurrentProduct(p); setShowReturn(true); }}
+                            >
+                              <ArrowPathIcon className="h-4 w-4" />
+                            </Button>
+                          </Tooltip>
+                          <Tooltip content="Modifier">
+                            <Button
+                              color="none"
+                              size="xs"
+                              className="text-blue-600 bg-transparent hover:bg-blue-900"
+                              onClick={() => openEdit(p)}
+                            >
+                              <PencilIcon className="h-4 w-4" />
+                            </Button>
+                          </Tooltip>
+                          <Tooltip content="Supprimer">
+                            <Button
+                              color="none"
+                              size="xs"
+                              className="text-red-600 bg-transparent hover:bg-blue-900"
+                              onClick={() => { setDelId(p.id); setShowDelete(true); }}
+                            >
+                              <TrashIcon className="h-4 w-4" />
+                            </Button>
+                          </Tooltip>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
             </FlowTableBody>
           </Table>
         </div>
       </div>
 
-      {/* Modals (unchanged) */}
+      {/* Modals */}
       <Modal show={showSale} onClose={() => setShowSale(false)}>
         <ModalHeader>Enregistrer une vente</ModalHeader>
         <ModalBody className="space-y-4">
@@ -316,12 +311,7 @@ export default function ProductsPage() {
             <TextInput
               type="number"
               value={transactionData.quantity}
-              onChange={(e) =>
-                setTransactionData({
-                  ...transactionData,
-                  quantity: e.target.value,
-                })
-              }
+              onChange={e => setTransactionData({ ...transactionData, quantity: e.target.value })}
               min="1"
               max={currentProduct?.quantity}
             />
@@ -331,23 +321,14 @@ export default function ProductsPage() {
             <TextInput
               type="number"
               value={transactionData.price}
-              onChange={(e) =>
-                setTransactionData({
-                  ...transactionData,
-                  price: e.target.value,
-                })
-              }
+              onChange={e => setTransactionData({ ...transactionData, price: e.target.value })}
               step="0.01"
             />
           </div>
         </ModalBody>
         <ModalFooter>
-          <Button color="light" onClick={() => setShowSale(false)}>
-            Annuler
-          </Button>
-          <Button color="success" onClick={() => handleTransaction(false)}>
-            Confirmer la vente
-          </Button>
+          <Button color="light" onClick={() => setShowSale(false)}>Annuler</Button>
+          <Button color="success" onClick={() => handleTransaction(false)}>Confirmer la vente</Button>
         </ModalFooter>
       </Modal>
 
@@ -359,12 +340,7 @@ export default function ProductsPage() {
             <TextInput
               type="number"
               value={transactionData.quantity}
-              onChange={(e) =>
-                setTransactionData({
-                  ...transactionData,
-                  quantity: e.target.value,
-                })
-              }
+              onChange={e => setTransactionData({ ...transactionData, quantity: e.target.value })}
               min="1"
             />
           </div>
@@ -373,23 +349,14 @@ export default function ProductsPage() {
             <TextInput
               type="number"
               value={transactionData.price}
-              onChange={(e) =>
-                setTransactionData({
-                  ...transactionData,
-                  price: e.target.value,
-                })
-              }
+              onChange={e => setTransactionData({ ...transactionData, price: e.target.value })}
               step="0.01"
             />
           </div>
         </ModalBody>
         <ModalFooter>
-          <Button color="light" onClick={() => setShowReturn(false)}>
-            Annuler
-          </Button>
-          <Button color="green" onClick={() => handleTransaction(true)}>
-            Confirmer le retour
-          </Button>
+          <Button color="light" onClick={() => setShowReturn(false)}>Annuler</Button>
+          <Button color="green" onClick={() => handleTransaction(true)}>Confirmer le retour</Button>
         </ModalFooter>
       </Modal>
 
@@ -397,47 +364,33 @@ export default function ProductsPage() {
         <ModalHeader>Confirmer la suppression</ModalHeader>
         <ModalBody className="text-center">
           <TrashIcon className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <p className="text-white mb-4">
-            Êtes-vous sûr de vouloir supprimer ce produit ? Cette action est irréversible.
-          </p>
+          <p className="text-gray-700 mb-4">Cette action est irréversible.</p>
         </ModalBody>
         <ModalFooter className="justify-center">
-          <Button color="light" onClick={() => setShowDelete(false)} className="mr-3">
-            Annuler
-          </Button>
-          <Button color="red" onClick={handleDelete}>
-            Supprimer définitivement
-          </Button>
+          <Button color="light" onClick={() => setShowDelete(false)} className="mr-3">Annuler</Button>
+          <Button color="red" onClick={handleDelete}>Supprimer définitivement</Button>
         </ModalFooter>
       </Modal>
 
       <Modal show={showAdd} onClose={() => setShowAdd(false)}>
-        <ModalHeader>
-          {currentProduct ? 'Modifier produit' : 'Nouveau produit'}
-        </ModalHeader>
+        <ModalHeader>{currentProduct ? 'Modifier produit' : 'Nouveau produit'}</ModalHeader>
         <ModalBody className="space-y-4">
           <div>
             <Label>Nom du produit</Label>
             <TextInput
               value={input.name}
-              onChange={(e) =>
-                setInput({ ...input, name: e.target.value })
-              }
+              onChange={e => setInput({ ...input, name: e.target.value })}
             />
           </div>
           <div>
             <Label>Catégorie</Label>
             <Select
               value={input.categoryId}
-              onChange={(e) =>
-                setInput({ ...input, categoryId: e.target.value })
-              }
+              onChange={e => setInput({ ...input, categoryId: e.target.value })}
             >
               <option value="">Sélectionner une catégorie</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
+              {categories.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </Select>
           </div>
@@ -447,9 +400,7 @@ export default function ProductsPage() {
               type="number"
               step="0.01"
               value={input.price}
-              onChange={(e) =>
-                setInput({ ...input, price: e.target.value })
-              }
+              onChange={e => setInput({ ...input, price: e.target.value })}
             />
           </div>
           <div>
@@ -457,16 +408,12 @@ export default function ProductsPage() {
             <TextInput
               type="number"
               value={input.quantity}
-              onChange={(e) =>
-                setInput({ ...input, quantity: e.target.value })
-              }
+              onChange={e => setInput({ ...input, quantity: e.target.value })}
             />
           </div>
         </ModalBody>
         <ModalFooter>
-          <Button color="light" onClick={() => setShowAdd(false)}>
-            Annuler
-          </Button>
+          <Button color="light" onClick={() => setShowAdd(false)}>Annuler</Button>
           <Button color="green" onClick={submitProduct}>
             {currentProduct ? 'Mettre à jour' : 'Créer produit'}
           </Button>
