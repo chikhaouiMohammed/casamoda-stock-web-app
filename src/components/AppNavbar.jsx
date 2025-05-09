@@ -1,7 +1,9 @@
+// /components/AppNavbar.jsx
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
-import { signOut } from 'firebase/auth';
+import { useState, useEffect } from 'react';
+import { signOut, onAuthStateChanged } from 'firebase/auth';
 import {
   Avatar,
   Dropdown,
@@ -18,6 +20,21 @@ import { auth } from '../../utils/firebase';
 export default function AppNavbar() {
   const router   = useRouter();
   const pathname = usePathname();
+
+  // State to hold the current user's email
+  const [userEmail, setUserEmail] = useState('');
+
+  // Listen for auth state changes to grab current user's email
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, user => {
+      if (user?.email) {
+        setUserEmail(user.email);
+      } else {
+        setUserEmail('');
+      }
+    });
+    return unsubscribe;
+  }, []);
 
   const navLinks = [
     { name: 'Dashboard',    href: '/dashboard'  },
@@ -39,7 +56,7 @@ export default function AppNavbar() {
         onClick={() => router.push('/dashboard')}
       >
         <span className="self-center whitespace-nowrap text-xl font-semibold text-white">
-          Akcher
+          CasaModa
         </span>
       </NavbarBrand>
 
@@ -50,16 +67,13 @@ export default function AppNavbar() {
           label={
             <Avatar
               alt="User settings"
-              img="/images/akcher_profile_image.jpg"
+              img="/images/CASA_MODA_logo.png"
               rounded
             />
           }
         >
           <DropdownHeader>
-            <span className="block text-sm">Amine Chermiti</span>
-            <span className="block truncate text-sm font-medium">
-              amiechermitti@hotmail.com
-            </span>
+            <span className="block text-sm">{userEmail || '—'}</span>
           </DropdownHeader>
           <DropdownItem onClick={() => router.push('/change-password')}>
             Modifier Mot de Passe
