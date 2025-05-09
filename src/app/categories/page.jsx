@@ -5,17 +5,29 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
-  collection, query, where, getDocs,
-  addDoc, updateDoc, deleteDoc, doc, serverTimestamp,
+  collection,
+  query,
+  where,
+  getDocs,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  doc,
+  serverTimestamp,
 } from 'firebase/firestore';
 import { PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import {
   Button,
-  Modal, ModalHeader, ModalBody, ModalFooter,
-  Table, TableHead, TableHeadCell,
-  TableBody as FlowTableBody, TableRow, TableCell,
-  Badge,
-  Tooltip,
+  Modal,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  Table,
+  TableHead,
+  TableHeadCell,
+  TableBody as FlowTableBody,
+  TableRow,
+  TableCell,
   TextInput,
   Label,
 } from 'flowbite-react';
@@ -29,59 +41,70 @@ export default function CategoriesPage() {
   const [checkingAuth, setCheckingAuth] = useState(true);
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, user => {
-      if (!user) {
-        router.replace('/login');
-      } else {
-        setCheckingAuth(false);
-      }
+      if (!user) router.replace('/login');
+      else      setCheckingAuth(false);
     });
     return unsubscribe;
   }, [router]);
 
-  // —— Original state & logic ——  
-  const [cats, setCats] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [showAdd, setShowAdd] = useState(false);
-  const [showEdit, setShowEdit] = useState(false);
-  const [showDel, setShowDel] = useState(false);
-  const [current, setCurrent] = useState({ id: '', name: '' });
-  const [input, setInput] = useState('');
-  const [delId, setDelId] = useState('');
+  // —— Original + colour state & logic ——
+  const [cats, setCats]           = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [showAdd, setShowAdd]     = useState(false);
+  const [showEdit, setShowEdit]   = useState(false);
+  const [showDel, setShowDel]     = useState(false);
+  const [current, setCurrent]     = useState({ id:'', name:'', color:'#000000', colorName:'' });
+  const [inputName, setInputName] = useState('');
+  const [inputColor, setInputColor]       = useState('#000000');
+  const [inputColorName, setInputColorName] = useState('');
+  const [delId, setDelId]         = useState('');
 
+  // load categories
   async function load() {
     const storeId = sessionStorage.getItem('storeId') || 'akcher';
     const q = query(
       collection(db, 'categories'),
-      where('storeId', '==', storeId)
+      where('storeId','==',storeId)
     );
     const snap = await getDocs(q);
-    setCats(snap.docs.map(d => ({ id: d.id, ...d.data() }))); // Added missing closing parenthesis
+    setCats(snap.docs.map(d=>({
+      id: d.id,
+      name: d.data().name,
+      color: d.data().color || '#000000',
+      colorName: d.data().colorName || '',
+      createdAt: d.data().createdAt,
+      updatedAt: d.data().updatedAt,
+    })));
     setLoading(false);
   }
 
-  useEffect(() => {
-    load();
-  }, []);
+  useEffect(() => { load(); }, []);
 
   const refresh = () => load();
 
   const handleAdd = async () => {
-    if (!input.trim()) return;
+    if (!inputName.trim()) return;
     const storeId = sessionStorage.getItem('storeId') || 'akcher';
     await addDoc(collection(db, 'categories'), {
-      name: input,
+      name:      inputName,
+      color:     inputColor,
+      colorName: inputColorName.trim(),
       storeId,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
     setShowAdd(false);
-    setInput('');
+    setInputName('');
+    setInputColor('#000000');
+    setInputColorName('');
     refresh();
   };
 
   const handleEdit = async () => {
-    await updateDoc(doc(db, 'categories', current.id), {
-      name: input,
+    await updateDoc(doc(db,'categories',current.id), {
+      name:      inputName,
+      color:     inputColor,
+      colorName: inputColorName.trim(),
       updatedAt: serverTimestamp(),
     });
     setShowEdit(false);
@@ -89,12 +112,13 @@ export default function CategoriesPage() {
   };
 
   const handleDelete = async () => {
-    await deleteDoc(doc(db, 'categories', delId));
+    await deleteDoc(doc(db,'categories',delId));
     setShowDel(false);
     refresh();
   };
 
-  const formatDate = ts => ts?.toDate().toLocaleDateString('fr-FR');
+  const formatDate = ts =>
+    ts?.toDate().toLocaleDateString('fr-FR');
 
   // —— Render only after auth check passes ——
   if (checkingAuth) return null;
@@ -106,9 +130,17 @@ export default function CategoriesPage() {
       <div className="p-6 bg-gray-50 min-h-screen space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between gap-4 mb-6">
-          <h1 className="text-2xl font-semibold text-gray-900">Gestion des catégories</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">
+            Gestion des catégories
+          </h1>
           <Button
-            onClick={() => setShowAdd(true)}
+            onClick={() => {
+              setCurrent({ id:'', name:'', color:'#000000', colorName:'' });
+              setInputName('');
+              setInputColor('#000000');
+              setInputColorName('');
+              setShowAdd(true);
+            }}
             color="green"
             className="bg-white text-gray-900 hover:bg-gray-50 border border-gray-200 shadow-sm"
           >
@@ -122,6 +154,7 @@ export default function CategoriesPage() {
             <TableHead className="bg-gray-50">
               <TableRow>
                 <TableHeadCell>Nom</TableHeadCell>
+                <TableHeadCell>Couleur</TableHeadCell>
                 <TableHeadCell>Créée le</TableHeadCell>
                 <TableHeadCell>Modifiée le</TableHeadCell>
                 <TableHeadCell className="text-right">Actions</TableHeadCell>
@@ -129,50 +162,55 @@ export default function CategoriesPage() {
             </TableHead>
             <FlowTableBody>
               {cats.map(cat => (
-                <TableRow
-                  key={cat.id}
-                  className="hover:bg-gray-50 border-b-[1px]"
-                >
-                  <TableCell className="font-medium">{cat.name}</TableCell>
-                  <TableCell>
-                    <Badge color="gray" className="w-fit">
-                      {formatDate(cat.createdAt) || 'N/A'}
-                    </Badge>
+                <TableRow key={cat.id} className="hover:bg-gray-50 border-b-[1px]">
+                  <TableCell className="font-medium">
+                    {cat.name}
                   </TableCell>
                   <TableCell>
-                    <Badge color="gray" className="w-fit">
-                      {formatDate(cat.updatedAt) || 'N/A'}
-                    </Badge>
+                    <div className="flex items-center space-x-2">
+                      <span
+                        className="w-4 h-4 rounded-full border"
+                        style={{ backgroundColor: cat.color }}
+                        title={cat.colorName || cat.color}
+                      />
+                      <span className="text-sm text-gray-700">
+                        {cat.colorName || cat.color}
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-sm text-gray-600">
+                    {formatDate(cat.createdAt) || 'N/A'}
+                  </TableCell>
+                  <TableCell className="text-sm text-gray-600">
+                    {formatDate(cat.updatedAt) || 'N/A'}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
-                      <Tooltip content="Modifier">
-                        <Button
-                          color="none"
-                          size="xs"
-                          className="text-blue-600 bg-transparent hover:bg-blue-900"
-                          onClick={() => {
-                            setCurrent(cat);
-                            setInput(cat.name);
-                            setShowEdit(true);
-                          }}
-                        >
-                          <PencilIcon className="h-4 w-4" />
-                        </Button>
-                      </Tooltip>
-                      <Tooltip content="Supprimer">
-                        <Button
-                          color="none"
-                          size="xs"
-                          className="text-red-600 bg-transparent hover:bg-blue-900"
-                          onClick={() => {
-                            setDelId(cat.id);
-                            setShowDel(true);
-                          }}
-                        >
-                          <TrashIcon className="h-4 w-4" />
-                        </Button>
-                      </Tooltip>
+                      <Button
+                        size="xs"
+                        color="white"
+                        className=' cursor-pointer'
+                        onClick={() => {
+                          setCurrent(cat);
+                          setInputName(cat.name);
+                          setInputColor(cat.color);
+                          setInputColorName(cat.colorName);
+                          setShowEdit(true);
+                        }}
+                      >
+                        <PencilIcon className="h-4 w-4 text-blue-800" />
+                      </Button>
+                      <Button
+                        size="xs"
+                        color="white"
+                        className=' cursor-pointer'
+                        onClick={() => {
+                          setDelId(cat.id);
+                          setShowDel(true);
+                        }}
+                      >
+                        <TrashIcon className="h-4 w-4 text-red-500" />
+                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -182,17 +220,38 @@ export default function CategoriesPage() {
         </div>
       </div>
 
-      {/* Modals remain the same as before */}
       {/* Add Modal */}
-      <Modal show={showAdd} onClose={() => setShowAdd(false)}>
+      <Modal show={showAdd} size="md" onClose={() => setShowAdd(false)}>
         <ModalHeader>Nouvelle catégorie</ModalHeader>
         <ModalBody className="space-y-4">
           <div>
-            <Label>Nom de la catégorie</Label>
+            <Label htmlFor="catColor" className="block text-gray-700">
+              Couleur
+            </Label>
+            <input
+              id="catColor"
+              type="color"
+              value={inputColor}
+              onChange={e => setInputColor(e.target.value)}
+              className="w-10 h-10 p-0 border-none bg-transparent"
+            />
             <TextInput
-              placeholder="Entrez le nom de la catégorie"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
+              placeholder="Nom de la couleur (ex : Rouge)"
+              value={inputColorName}
+              onChange={e => setInputColorName(e.target.value)}
+              className="mt-2"
+            />
+          </div>
+          <div>
+            <Label htmlFor="catName" className="block text-gray-700">
+              Nom de la catégorie
+            </Label>
+            <TextInput
+              id="catName"
+              placeholder="Entrez le nom"
+              value={inputName}
+              onChange={e => setInputName(e.target.value)}
+              className="mt-1"
             />
           </div>
         </ModalBody>
@@ -207,14 +266,36 @@ export default function CategoriesPage() {
       </Modal>
 
       {/* Edit Modal */}
-      <Modal show={showEdit} onClose={() => setShowEdit(false)}>
+      <Modal show={showEdit} size="md" onClose={() => setShowEdit(false)}>
         <ModalHeader>Modifier la catégorie</ModalHeader>
         <ModalBody className="space-y-4">
           <div>
-            <Label>Nom de la catégorie</Label>
+            <Label htmlFor="editColor" className="block text-gray-700">
+              Couleur
+            </Label>
+            <input
+              id="editColor"
+              type="color"
+              value={inputColor}
+              onChange={e => setInputColor(e.target.value)}
+              className="w-10 h-10 p-0 border-none bg-transparent"
+            />
             <TextInput
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
+              placeholder="Nom de la couleur"
+              value={inputColorName}
+              onChange={e => setInputColorName(e.target.value)}
+              className="mt-2"
+            />
+          </div>
+          <div>
+            <Label htmlFor="editName" className="block text-gray-700">
+              Nom de la catégorie
+            </Label>
+            <TextInput
+              id="editName"
+              value={inputName}
+              onChange={e => setInputName(e.target.value)}
+              className="mt-1"
             />
           </div>
         </ModalBody>
@@ -229,20 +310,19 @@ export default function CategoriesPage() {
       </Modal>
 
       {/* Delete Confirmation */}
-      <Modal show={showDel} onClose={() => setShowDel(false)}>
-        <ModalHeader>Confirmer la suppression</ModalHeader>
-        <ModalBody className="text-center">
-          <TrashIcon className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <p className="text-white mb-4">
-            Êtes-vous sûr de vouloir supprimer cette catégorie ? Cette action est irréversible.
-          </p>
+      <Modal show={showDel} size="sm" popup onClose={() => setShowDel(false)}>
+        <ModalHeader />
+        <ModalBody>
+          <div className="text-center text-gray-900">
+            Voulez-vous vraiment supprimer cette catégorie ?
+          </div>
         </ModalBody>
-        <ModalFooter className="justify-center">
-          <Button color="light" onClick={() => setShowDel(false)} className="mr-3">
+        <ModalFooter>
+          <Button color="light" onClick={() => setShowDel(false)}>
             Annuler
           </Button>
-          <Button color="red" onClick={handleDelete}>
-            Supprimer définitivement
+          <Button color="failure" onClick={handleDelete}>
+            Supprimer
           </Button>
         </ModalFooter>
       </Modal>

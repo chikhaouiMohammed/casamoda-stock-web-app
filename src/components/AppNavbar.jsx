@@ -1,4 +1,3 @@
-// /components/AppNavbar.jsx
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
@@ -62,7 +61,9 @@ export default function AppNavbar() {
               amiechermitti@hotmail.com
             </span>
           </DropdownHeader>
-          
+          <DropdownItem onClick={() => router.push('/change-password')}>
+            Modifier Mot de Passe
+          </DropdownItem>
           <DropdownItem onClick={handleLogout}>
             Déconnexion
           </DropdownItem>
@@ -77,7 +78,9 @@ export default function AppNavbar() {
             key={link.href}
             onClick={() => router.push(link.href)}
             active={pathname === link.href}
-            className="cursor-pointer"
+            className={`cursor-pointer text-white hover:text-blue-300 ${
+              pathname === link.href ? 'font-semibold underline' : ''
+            }`}
           >
             {link.name}
           </NavbarLink>
@@ -86,11 +89,3 @@ export default function AppNavbar() {
     </Navbar>
   );
 }
-
-
-// {/* <DropdownItem href='https://console.firebase.google.com/project/akcher-stock-app/authentication/users' onClick={() => {/* change password */}}>
-//             Modifier Mot de Passe
-//           </DropdownItem>
-//           <DropdownItem onClick={() => router.push('/settings')}>
-//             Paramètres
-//           </DropdownItem> */}
