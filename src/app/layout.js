@@ -12,7 +12,7 @@ const poppins = Poppins({
 });
 
 export const metadata = {
-  title: 'AkcherStock Dashboard',
+  title: 'CasamodaStock Dashboard',
   description: 'Gestion des catégories et produits',
   icons: {
     icon: [

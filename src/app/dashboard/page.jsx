@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
 import AppNavbar from '@/components/AppNavbar';
 import { auth, db } from '../../../utils/firebase';
 
@@ -16,6 +16,12 @@ import {
   TableBody as FlowTableBody,
   TableRow,
   TableCell,
+  Button,
+  Modal,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  Tooltip,
 } from 'flowbite-react';
 
 // Recharts
@@ -28,6 +34,7 @@ import {
   CartesianGrid,
   Tooltip as ReTooltip,
 } from 'recharts';
+import { TrashIcon } from '@heroicons/react/24/outline';
 
 // Date formatting helper
 const formatFirebaseDate = (timestamp) => {
@@ -118,7 +125,7 @@ export default function DashboardPage() {
     setDayRevenue(revDay);
     setMonthRevenue(revMonth);
     setProductsSoldDay(qtyDay);
-    setAvgBasketDay(avgDay);
+    setAvgBasketDay(avgDay);  
 
     const saleRecords = sd.map(sale => {
       const name = sale.productName
@@ -172,12 +179,25 @@ export default function DashboardPage() {
     setChartData(arr);
   }, [sales, returns_, year]);
 
+  const [showDelete, setShowDelete] = useState(false);
+  const [delId, setDelId] = useState('');
+
+  // Delete sale handler
+  const handleDeleteSale = async () => {
+    try {
+      await deleteDoc(doc(db, 'sales', delId));
+      setSales(prev => prev.filter(s => s.id !== delId));
+      setShowDelete(false);
+    } catch (error) {
+      alert('Erreur lors de la suppression de la vente.');
+    }
+  };
+
   if (checkingAuth) return null;
 
   return (
     <>
       <AppNavbar />
-
       <div className="p-6 space-y-8 bg-gray-50 min-h-screen">
         {/* Date pickers */}
         <div className="flex gap-4">
@@ -238,8 +258,10 @@ export default function DashboardPage() {
                     <TableHeadCell>Date/Heure</TableHeadCell>
                     <TableHeadCell>Produit</TableHeadCell>
                     <TableHeadCell>Quantité</TableHeadCell>
+                    <TableHeadCell>Prix d'origine (DA)</TableHeadCell>
                     <TableHeadCell>PU (DA)</TableHeadCell>
                     <TableHeadCell>Total (DA)</TableHeadCell>
+                    <TableHeadCell>Action</TableHeadCell>
                   </TableRow>
                 </TableHead>
                 <FlowTableBody className="divide-y">
@@ -248,8 +270,28 @@ export default function DashboardPage() {
                       <TableCell>{formatFirebaseDate(r.date)}</TableCell>
                       <TableCell>{r.name}</TableCell>
                       <TableCell>{r.quantity}</TableCell>
+                      <TableCell>{
+                        // Find the original price from products array
+                        (() => {
+                          const product = products.find(p => p.name === r.name || p.id === r.productId);
+                          return product ? product.price?.toFixed(2) || '—' : '—';
+                        })()
+                      }</TableCell>
                       <TableCell>{r.unitPrice.toFixed(2)}</TableCell>
                       <TableCell>{r.total.toFixed(2)}</TableCell>
+                      <TableCell>
+                        {r.quantity > 0 && (
+                          <Tooltip content="Supprimer la vente" placement="top">
+                            <span
+                              onClick={() => { setDelId(r.id); setShowDelete(true); }}
+                              className="cursor-pointer rounded-full p-2 hover:bg-gray-100 transition"
+                              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                            >
+                              <TrashIcon className="h-6 w-6 text-red-500" />
+                            </span>
+                          </Tooltip>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </FlowTableBody>
@@ -257,6 +299,18 @@ export default function DashboardPage() {
             </div>
           )}
         </div>
+        {/* Delete Modal */}
+        <Modal show={showDelete} onClose={() => setShowDelete(false)}>
+          <ModalHeader>Confirmer la suppression</ModalHeader>
+          <ModalBody className="text-center">
+            <TrashIcon className="h-12 w-12 text-red-500 mx-auto mb-4" />
+            <p className="text-gray-700 mb-4">Cette action est irréversible.</p>
+          </ModalBody>
+          <ModalFooter className="justify-center">
+            <Button color="light" onClick={() => setShowDelete(false)} className="mr-3">Annuler</Button>
+            <Button color="red" onClick={handleDeleteSale}>Supprimer définitivement</Button>
+          </ModalFooter>
+        </Modal>
 
         {/* Annual chart */}
         <div className="bg-white shadow rounded-lg p-6">
