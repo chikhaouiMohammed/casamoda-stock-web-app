@@ -185,6 +185,23 @@ export default function DashboardPage() {
   // Delete sale handler
   const handleDeleteSale = async () => {
     try {
+      // Find the sale to delete
+      const sale = sales.find(s => s.id === delId);
+      if (!sale) throw new Error('Vente introuvable.');
+
+      // Find the product to update
+      const product = products.find(p => p.id === sale.productId);
+      if (!product) throw new Error('Produit introuvable.');
+
+      // Update product quantity in Firestore
+      const productRef = doc(db, 'products', product.id);
+      await import('firebase/firestore').then(async ({ updateDoc }) => {
+        await updateDoc(productRef, {
+          quantity: (product.quantity || 0) + sale.quantity
+        });
+      });
+
+      // Delete the sale
       await deleteDoc(doc(db, 'sales', delId));
       setSales(prev => prev.filter(s => s.id !== delId));
       setShowDelete(false);
