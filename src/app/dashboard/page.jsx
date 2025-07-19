@@ -34,7 +34,7 @@ import {
   CartesianGrid,
   Tooltip as ReTooltip,
 } from 'recharts';
-import { TrashIcon } from '@heroicons/react/24/outline';
+import { TrashIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 
 // Date formatting helper
 const formatFirebaseDate = (timestamp) => {
@@ -48,6 +48,10 @@ const formatFirebaseDate = (timestamp) => {
 };
 
 export default function DashboardPage() {
+  // For return modal
+  const [showReturn, setShowReturn] = useState(false);
+  const [currentSale, setCurrentSale] = useState(null);
+  const [returnData, setReturnData] = useState({ quantity: '', price: '' });
   const router = useRouter();
   const [checkingAuth, setCheckingAuth] = useState(true);
 
@@ -182,31 +186,86 @@ export default function DashboardPage() {
   const [showDelete, setShowDelete] = useState(false);
   const [delId, setDelId] = useState('');
 
-  // Delete sale handler
+  // Delete sale, return, or product handler
   const handleDeleteSale = async () => {
     try {
-      // Find the sale to delete
-      const sale = sales.find(s => s.id === delId);
-      if (!sale) throw new Error('Vente introuvable.');
+      // Try to find in sales first
+      let record = sales.find(s => s.id === delId);
+      let collectionName = 'sales';
+      let isReturn = false;
+      if (!record) {
+        // Try to find in returns
+        record = returns_.find(r => r.id === delId);
+        collectionName = 'returns';
+        isReturn = true;
+      }
+      // If not found in sales or returns, check if it's a product id (cascade delete)
+      if (!record) {
+        // ...existing code for product deletion...
+        const product = products.find(p => p.id === delId);
+        if (product) {
+          await import('firebase/firestore').then(async ({ deleteDoc, doc }) => {
+            // Delete all sales
+            const salesToDelete = sales.filter(s => s.productId === product.id);
+            for (const s of salesToDelete) {
+              await deleteDoc(doc(db, 'sales', s.id));
+            }
+            // Delete all returns
+            const returnsToDelete = returns_.filter(r => r.productId === product.id);
+            for (const r of returnsToDelete) {
+              await deleteDoc(doc(db, 'returns', r.id));
+            }
+            // Delete the product itself
+            await deleteDoc(doc(db, 'products', product.id));
+          });
+          setSales(prev => prev.filter(s => s.productId !== product.id));
+          setReturns(prev => prev.filter(r => r.productId !== product.id));
+          setProducts(prev => prev.filter(p => p.id !== product.id));
+          setShowDelete(false);
+          return;
+        } else {
+          throw new Error('Enregistrement introuvable.');
+        }
+      }
 
       // Find the product to update
-      const product = products.find(p => p.id === sale.productId);
+      let product = products.find(p => p.id === record.productId);
+      // If not found by id, try by name
+      if (!product && record.name) {
+        product = products.find(p => p.name === record.name);
+      }
       if (!product) throw new Error('Produit introuvable.');
+
+      // Do not cascade delete returns when deleting a sale. User must delete returns manually.
 
       // Update product quantity in Firestore
       const productRef = doc(db, 'products', product.id);
       await import('firebase/firestore').then(async ({ updateDoc }) => {
+        // For sales: add back the quantity. For returns: subtract the returned quantity.
+        let newQty = product.quantity;
+        if (isReturn) {
+          newQty = (product.quantity || 0) - Math.abs(record.quantity);
+        } else {
+          newQty = (product.quantity || 0) + Math.abs(record.quantity);
+        }
         await updateDoc(productRef, {
-          quantity: (product.quantity || 0) + sale.quantity
+          quantity: newQty
         });
       });
 
-      // Delete the sale
-      await deleteDoc(doc(db, 'sales', delId));
-      setSales(prev => prev.filter(s => s.id !== delId));
+      // Delete the record from the correct collection
+      await deleteDoc(doc(db, collectionName, delId));
+      if (isReturn) {
+        setReturns(prev => prev.filter(r => r.id !== delId));
+      } else {
+        setSales(prev => prev.filter(s => s.id !== delId));
+      }
+      // Re-fetch products to update stock in UI
+      const pSnap = await getDocs(collection(db, 'products'));
+      setProducts(pSnap.docs.map(d=>({ id:d.id, ...d.data() })));
       setShowDelete(false);
     } catch (error) {
-      alert('Erreur lors de la suppression de la vente.');
+      alert('Erreur lors de la suppression.');
     }
   };
 
@@ -297,8 +356,25 @@ export default function DashboardPage() {
                       <TableCell>{r.unitPrice.toFixed(2)}</TableCell>
                       <TableCell>{r.total.toFixed(2)}</TableCell>
                       <TableCell>
-                        {r.quantity > 0 && (
-                          <Tooltip content="Supprimer la vente" placement="top">
+                        <div className="flex gap-2">
+                          {/* Récupérer button only for sales */}
+                          {r.quantity > 0 && (
+                            <Tooltip content="Récupérer" placement="top">
+                              <span
+                                onClick={() => {
+                                  setCurrentSale(r);
+                                  setReturnData({ quantity: r.quantity.toString(), price: r.unitPrice.toString() });
+                                  setShowReturn(true);
+                                }}
+                                className="cursor-pointer rounded-full p-2 hover:bg-blue-100 transition"
+                                style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                              >
+                                <ArrowPathIcon className="h-6 w-6 text-purple-500" />
+                              </span>
+                            </Tooltip>
+                          )}
+                          {/* Delete button for both sales and returns */}
+                          <Tooltip content={r.quantity > 0 ? "Supprimer la vente" : "Supprimer le retour"} placement="top">
                             <span
                               onClick={() => { setDelId(r.id); setShowDelete(true); }}
                               className="cursor-pointer rounded-full p-2 hover:bg-gray-100 transition"
@@ -307,7 +383,7 @@ export default function DashboardPage() {
                               <TrashIcon className="h-6 w-6 text-red-500" />
                             </span>
                           </Tooltip>
-                        )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -326,6 +402,82 @@ export default function DashboardPage() {
           <ModalFooter className="justify-center">
             <Button color="light" onClick={() => setShowDelete(false)} className="mr-3">Annuler</Button>
             <Button color="red" onClick={handleDeleteSale}>Supprimer définitivement</Button>
+          </ModalFooter>
+        </Modal>
+
+        {/* Return Modal */}
+        <Modal show={showReturn} onClose={() => setShowReturn(false)}>
+          <ModalHeader>Enregistrer un retour</ModalHeader>
+          <ModalBody className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Quantité récupérée</label>
+              <input
+                type="number"
+                className="border rounded px-2 py-1 w-full"
+                value={returnData.quantity}
+                min="1"
+                max={currentSale?.quantity}
+                onChange={e => setReturnData({ ...returnData, quantity: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Montant remboursé</label>
+              <input
+                type="number"
+                className="border rounded px-2 py-1 w-full"
+                value={returnData.price}
+                step="0.01"
+                onChange={e => setReturnData({ ...returnData, price: e.target.value })}
+              />
+            </div>
+          </ModalBody>
+          <ModalFooter>
+            <Button color="light" onClick={() => setShowReturn(false)}>Annuler</Button>
+            <Button color="green" onClick={async () => {
+              if (!currentSale || !returnData.quantity || !returnData.price) return;
+              const qty = parseInt(returnData.quantity, 10);
+              const price = parseFloat(returnData.price);
+              // Ensure productId exists
+              let productId = currentSale.productId;
+              if (!productId) {
+                // Try to find product by name
+                const productByName = products.find(p => p.name === currentSale.name);
+                if (productByName) productId = productByName.id;
+              }
+              if (!productId) {
+                alert('Impossible de trouver le produit pour ce retour.');
+                return;
+              }
+              await import('firebase/firestore').then(async ({ addDoc, collection, serverTimestamp, updateDoc, doc: docRef }) => {
+                const now = new Date();
+                const docRefReturn = await addDoc(collection(db, 'returns'), {
+                  productId,
+                  quantity: qty,
+                  price,
+                  date: serverTimestamp(),
+                });
+                // Update product quantity (add back the returned quantity)
+                const product = products.find(p => p.id === productId);
+                if (product) {
+                  await updateDoc(docRef(db, 'products', product.id), { quantity: (product.quantity || 0) + Math.abs(qty) });
+                }
+                // Add to local returns_ state for immediate UI update
+                setReturns(prev => [
+                  ...prev,
+                  {
+                    id: docRefReturn.id,
+                    productId,
+                    quantity: qty,
+                    price,
+                    date: { toDate: () => now },
+                  }
+                ]);
+              });
+              // Re-fetch products to update stock in UI
+              const pSnap = await getDocs(collection(db, 'products'));
+              setProducts(pSnap.docs.map(d=>({ id:d.id, ...d.data() })));
+              setShowReturn(false);
+            }}>Confirmer le retour</Button>
           </ModalFooter>
         </Modal>
 
